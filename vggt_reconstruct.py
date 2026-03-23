@@ -50,7 +50,7 @@ def reconstruct(image_folder: str, output_dir: str = "output", conf_threshold: f
     use_amp = device == "cuda"
     dtype = torch.bfloat16 if (use_amp and torch.cuda.get_device_capability()[0] >= 8) else torch.float16
 
-    model = VGGT.from_pretrained("facebook/VGGT")
+    model = VGGT.from_pretrained("facebook/VGGT-1B")
     model = model.to(device)
     model.eval()
     print(f"[VGGT] Model loaded in {time.time()-t0:.1f}s (device={device}, amp={'on' if use_amp else 'off'})")
