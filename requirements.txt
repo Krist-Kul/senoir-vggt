@@ -5,5 +5,4 @@ Pillow
 huggingface_hub
 einops
 safetensors
-rembg
-pillow-heif
+open3d
