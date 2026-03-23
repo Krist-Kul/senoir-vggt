@@ -47,23 +47,28 @@ def reconstruct(image_folder: str, output_dir: str = "output", conf_threshold: f
     print("[VGGT] Loading model...")
     t0 = time.time()
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    dtype = torch.bfloat16 if (device == "cuda" and torch.cuda.get_device_capability()[0] >= 8) else torch.float16
+    use_amp = device == "cuda"
+    dtype = torch.bfloat16 if (use_amp and torch.cuda.get_device_capability()[0] >= 8) else torch.float16
 
     model = VGGT.from_pretrained("facebook/VGGT")
-    model = model.to(device=device, dtype=dtype)
+    model = model.to(device)
     model.eval()
-    print(f"[VGGT] Model loaded in {time.time()-t0:.1f}s ({dtype}, {device})")
+    print(f"[VGGT] Model loaded in {time.time()-t0:.1f}s (device={device}, amp={'on' if use_amp else 'off'})")
 
-    # Preprocess images
+    # Preprocess images — keep float32, autocast handles mixed precision
     print("[VGGT] Preprocessing images...")
     images = load_and_preprocess_images(image_paths)  # (S, 3, H, W)
-    images = images.unsqueeze(0).to(device=device, dtype=dtype)  # (1, S, 3, H, W)
+    images = images.unsqueeze(0).to(device)  # (1, S, 3, H, W)
 
-    # Inference
+    # Inference — model stays float32, autocast wraps ops that benefit from lower precision
     print("[VGGT] Running inference...")
     t0 = time.time()
-    with torch.no_grad(), torch.amp.autocast(device_type=device, dtype=dtype):
-        preds = model(images)
+    with torch.no_grad():
+        if use_amp:
+            with torch.cuda.amp.autocast(dtype=dtype):
+                preds = model(images)
+        else:
+            preds = model(images)
     print(f"[VGGT] Inference done in {time.time()-t0:.1f}s")
 
     # Extract point maps: (1, S, H, W, 3) -> (S, H, W, 3)
